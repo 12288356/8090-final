@@ -1,0 +1,291 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+from task1_oop_inventory import NormalItem, DiscountItem
+
+
+class InventoryMatrix:
+    def __init__(self):
+        self.matrix = [] 
+    
+    def add(self, item):
+        total = item.get_quantity() * item.get_price()
+        self.matrix.append([item.number, item.get_name(), item.get_quantity(), item.get_price(), total])
+    
+    def remove(self, id):
+        for i in range(len(self.matrix)):
+            if self.matrix[i][0] == id:
+                return self.matrix.pop(i)
+        return None
+    
+    def update(self, item):
+        for i in range(len(self.matrix)):
+            if self.matrix[i][0] == item.number:
+                total = item.get_quantity() * item.get_price()
+                self.matrix[i] = [item.number, item.get_name(), item.get_quantity(), item.get_price(), total]
+                return True
+        return False
+    
+    def cocktail_sort(self, col, asc=True):
+        n = len(self.matrix)
+        if n <= 1:
+            return
+        
+        start = 0
+        end = n - 1
+        swapped = True
+        
+        while swapped:
+            swapped = False
+            
+            for i in range(start, end):
+                if asc:
+                    if self.matrix[i][col] > self.matrix[i+1][col]:
+                        self.matrix[i], self.matrix[i+1] = self.matrix[i+1], self.matrix[i]
+                        swapped = True
+                else:
+                    if self.matrix[i][col] < self.matrix[i+1][col]:
+                        self.matrix[i], self.matrix[i+1] = self.matrix[i+1], self.matrix[i]
+                        swapped = True
+            
+            if not swapped:
+                break
+            
+            swapped = False
+            end -= 1
+            
+            for i in range(end-1, start-1, -1):
+                if asc:
+                    if self.matrix[i][col] > self.matrix[i+1][col]:
+                        self.matrix[i], self.matrix[i+1] = self.matrix[i+1], self.matrix[i]
+                        swapped = True
+                else:
+                    if self.matrix[i][col] < self.matrix[i+1][col]:
+                        self.matrix[i], self.matrix[i+1] = self.matrix[i+1], self.matrix[i]
+                        swapped = True
+            
+            start += 1
+
+
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Inventory System")
+        self.root.geometry("850x550")
+        self.root.configure(bg="#f0f0f0")
+        
+        self.matrix = InventoryMatrix()
+        self.items = []
+        self.selected = None
+        
+        items_data = [("Laptop",10,10000), ("Mouse",20,300), ("Keyboard",15,2500)]
+        for name, quantity, price in items_data:
+            item = NormalItem(name, quantity, price)
+            self.items.append(item)
+            self.matrix.add(item)
+        
+        top = tk.LabelFrame(root, text="ITEM LIST", font=("Arial",12,"bold"), bg="#f0f0f0")
+        top.pack(fill="both", expand=True, padx=20, pady=5)
+        
+        s_frame = tk.Frame(top, bg="#f0f0f0")
+        s_frame.pack(fill="x", padx=10, pady=5)
+        tk.Label(s_frame, text="Sort by:", bg="#f0f0f0").pack(side="left")
+        self.sort_var = ttk.Combobox(s_frame, values=["ID","Name","Quantity","Price","Total"], width=8, state="readonly")
+        self.sort_var.set("ID")
+        self.sort_var.pack(side="left", padx=5)
+        tk.Button(s_frame, text="▲", command=lambda: self.do_sort(True), width=3).pack(side="left")
+        tk.Button(s_frame, text="▼", command=lambda: self.do_sort(False), width=3).pack(side="left")
+        
+        cols = ("ID","Name","Quantity","Price","Total")
+        self.table = ttk.Treeview(top, columns=cols, show="headings", height=5)
+        for col in cols:
+            self.table.heading(col, text=col)
+            self.table.column(col, width=100, anchor="center")
+        self.table.pack(fill="both", expand=True, padx=10, pady=5)
+        self.table.bind("<<TreeviewSelect>>", self.pick)
+        
+        bottom = tk.LabelFrame(root, text="MODIFY", font=("Arial",12,"bold"), bg="#f0f0f0")
+        bottom.pack(fill="x", padx=20, pady=10)
+        
+        f = tk.Frame(bottom, bg="#f0f0f0")
+        f.pack(pady=10)
+        
+        tk.Label(f, text="Name:", bg="#f0f0f0").grid(row=0, column=0, pady=3)
+        self.name_e = tk.Entry(f, width=15)
+        self.name_e.grid(row=0, column=1, padx=5)
+        tk.Button(f, text="SET", command=self.rename, bg="#FF9800", width=5).grid(row=0, column=2, padx=5)
+        
+        tk.Label(f, text="Quantity:", bg="#f0f0f0").grid(row=1, column=0, pady=3)
+        self.quantity_e = tk.Entry(f, width=8)
+        self.quantity_e.grid(row=1, column=1, padx=5)
+        tk.Button(f, text="+", command=self.add_quantity, bg="#ccc", width=3).grid(row=1, column=2, padx=2)
+        tk.Button(f, text="-", command=self.minus_quantity, bg="#ccc", width=3).grid(row=1, column=3, padx=2)
+        
+        tk.Label(f, text="Price:", bg="#f0f0f0").grid(row=2, column=0, pady=3)
+        self.price_e = tk.Entry(f, width=8)
+        self.price_e.grid(row=2, column=1, padx=5)
+        tk.Button(f, text="+", command=self.add_price, bg="#ccc", width=3).grid(row=2, column=2, padx=2)
+        tk.Button(f, text="-", command=self.minus_price, bg="#ccc", width=3).grid(row=2, column=3, padx=2)
+        
+        btn_f = tk.Frame(bottom, bg="#f0f0f0")
+        btn_f.pack(pady=10)
+        tk.Button(btn_f, text="NEW", command=self.new_item, bg="#4CAF50", width=8).pack(side="left", padx=5)
+        tk.Button(btn_f, text="DELETE", command=self.delete_item, bg="#f44336", width=8).pack(side="left", padx=5)
+        tk.Button(btn_f, text="DISCOUNT", command=self.do_discount, bg="#9C27B0", width=8).pack(side="left", padx=5)
+        tk.Button(btn_f, text="CLEAR", command=self.clear_all, bg="#f44336", width=8).pack(side="left", padx=5)
+        
+        self.stats = tk.Label(bottom, text="", bg="#f0f0f0", font=("Courier",9))
+        self.stats.pack(pady=5)
+        
+        self.show_list()
+    
+    def show_list(self):
+        for item in self.table.get_children():
+            self.table.delete(item)
+        for row in self.matrix.matrix:
+            self.table.insert("", "end", values=[row[0], row[1], row[2], f"${row[3]:.0f}", f"${row[4]:.0f}"])
+        
+        if self.matrix.matrix:
+            total = sum(r[4] for r in self.matrix.matrix)
+            quantity = sum(r[2] for r in self.matrix.matrix)
+            self.stats.config(text=f"Items: {len(self.matrix.matrix)}  Quantity: {quantity}  Total: ${total:,.0f}")
+        else:
+            self.stats.config(text="No items")
+    
+    def pick(self, event):
+        sel = self.table.selection()
+        if sel:
+            v = self.table.item(sel[0])['values']
+            self.selected = int(v[0])
+            self.name_e.delete(0, 'end')
+            self.name_e.insert(0, v[1])
+            self.quantity_e.delete(0, 'end')
+            self.quantity_e.insert(0, v[2])
+            self.price_e.delete(0, 'end')
+            self.price_e.insert(0, v[3].replace('$',''))
+    
+    def rename(self):
+        if self.selected:
+            for item in self.items:
+                if item.number == self.selected:
+                    item._name = self.name_e.get()
+                    self.matrix.update(item)
+                    self.show_list()
+    
+    def add_quantity(self):
+        if self.selected:
+            for item in self.items:
+                if item.number == self.selected:
+                    n = int(self.quantity_e.get()) if self.quantity_e.get() else 1
+                    item.add_quantity(n)
+                    self.matrix.update(item)
+                    self.show_list()
+                    self.quantity_e.delete(0,'end')
+                    self.quantity_e.insert(0, item.get_quantity())
+    
+    def minus_quantity(self):
+        if self.selected:
+            for item in self.items:
+                if item.number == self.selected:
+                    n = int(self.quantity_e.get()) if self.quantity_e.get() else 1
+                    item.minus_quantity(n)
+                    self.matrix.update(item)
+                    self.show_list()
+                    self.quantity_e.delete(0,'end')
+                    self.quantity_e.insert(0, item.get_quantity())
+    
+    def add_price(self):
+        if self.selected:
+            for item in self.items:
+                if item.number == self.selected:
+                    n = float(self.price_e.get()) if self.price_e.get() else 10
+                    item.add_price(n)
+                    self.matrix.update(item)
+                    self.show_list()
+                    self.price_e.delete(0,'end')
+                    self.price_e.insert(0, item.get_price())
+    
+    def minus_price(self):
+        if self.selected:
+            for item in self.items:
+                if item.number == self.selected:
+                    n = float(self.price_e.get()) if self.price_e.get() else 10
+                    item.minus_price(n)
+                    self.matrix.update(item)
+                    self.show_list()
+                    self.price_e.delete(0,'end')
+                    self.price_e.insert(0, item.get_price())
+    
+    def new_item(self):
+        win = tk.Toplevel(self.root)
+        win.title("New Item")
+        win.geometry("300x320")
+        win.configure(bg="#f0f0f0")
+        
+        tk.Label(win, text="NEW ITEM", font=("Arial",12,"bold"), bg="#f0f0f0").pack(pady=10)
+        
+        tk.Label(win, text="Name:", bg="#f0f0f0").pack()
+        name = tk.Entry(win)
+        name.pack()
+        
+        tk.Label(win, text="Quantity:", bg="#f0f0f0").pack()
+        quantity = tk.Entry(win)
+        quantity.pack()
+        
+        tk.Label(win, text="Price:", bg="#f0f0f0").pack()
+        price = tk.Entry(win)
+        price.pack()
+        
+        def save():
+            try:
+                n = name.get().strip()
+                if n:
+                    item = NormalItem(n, int(quantity.get()), float(price.get()))
+                    self.items.append(item)
+                    self.matrix.add(item)
+                    self.show_list()
+                    win.destroy()
+            except:
+                messagebox.showerror("Error", "Invalid!")
+        
+        tk.Button(win, text="CREATE", command=save, bg="#4CAF50", width=12).pack(pady=20)
+    
+    def delete_item(self):
+        if self.selected and messagebox.askyesno("Confirm", "Delete?"):
+            self.matrix.remove(self.selected)
+            self.items = [i for i in self.items if i.number != self.selected]
+            self.selected = None
+            self.show_list()
+    
+    def do_discount(self):
+        if self.selected:
+            for i, item in enumerate(self.items):
+                if item.number == self.selected:
+                    if not isinstance(item, DiscountItem):
+                        new = DiscountItem(item.get_name(), item.get_quantity(), item.get_price())
+                        new.number = item.number
+                        self.items[i] = new
+                        self.matrix.update(new)
+                        self.show_list()
+                        messagebox.showinfo("Done", "10% off!")
+                    break
+    
+    def do_sort(self, asc):
+        cols = ["ID","Name","Quantity","Price","Total"]
+        col = self.sort_var.get()
+        if col in cols:
+            idx = cols.index(col)
+            self.matrix.cocktail_sort(idx, asc)
+            self.show_list()
+    
+    def clear_all(self):
+        if messagebox.askyesno("Confirm", "Clear all?"):
+            self.matrix.matrix = []
+            self.items = []
+            self.selected = None
+            self.show_list()
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    App(root)
+    root.mainloop()
