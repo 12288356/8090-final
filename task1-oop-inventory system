@@ -1,0 +1,185 @@
+import tkinter as tk
+from tkinter import messagebox
+from abc import ABC, abstractmethod
+
+class Item(ABC):
+    id = 1
+    
+    def __init__(self, name, quantity, price):
+        self.number = Item.id
+        self._name = name 
+        self._quantity = quantity
+        self._price = price  
+        Item.id += 1
+    
+    def get_name(self): return self._name
+    def get_quantity(self): return self._quantity
+    def get_price(self): return self._price
+    
+    def add_quantity(self, n): self._quantity += n
+    def minus_quantity(self, n):
+        if self._quantity >= n: self._quantity -= n
+    
+    def add_price(self, n): self._price += n
+    def minus_price(self, n):
+        if self._price > n: self._price -= n
+    
+    @abstractmethod  
+    def get_total(self): pass
+
+class NormalItem(Item):
+    def get_total(self): return self.get_quantity() * self.get_price()
+
+class DiscountItem(Item):
+    def get_total(self): return self.get_quantity() * self.get_price() * 0.9
+
+
+class App:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Inventory")
+        self.root.geometry("480x500")
+        self.root.configure(bg="#f0f0f0")
+        
+        self.items = []
+        self.now = None
+        
+        tk.Label(root, text="INVENTORY", font=("Arial", 16, "bold"), bg="#f0f0f0").pack(pady=10)
+        
+        self.box = tk.Listbox(root, height=10, font=("Courier", 10), selectbackground="gold")
+        self.box.pack(fill="both", expand=True, padx=20, pady=10)
+        self.box.bind("<<ListboxSelect>>", self.pick)
+        
+        mod = tk.LabelFrame(root, text="MODIFY", bg="#f0f0f0", padx=8, pady=5)
+        mod.pack(fill="x", padx=20, pady=10)
+        
+        tk.Label(mod, text="Name:", bg="#f0f0f0").grid(row=0, column=0, pady=3, sticky="e")
+        self.name_in = tk.Entry(mod, width=12)
+        self.name_in.grid(row=0, column=1, padx=3)
+        tk.Button(mod, text="SET", command=self.rename, bg="#FF9800", width=5).grid(row=0, column=2, padx=3)
+        
+        tk.Label(mod, text="quantity", bg="#f0f0f0").grid(row=1, column=0, pady=3, sticky="e")
+        self.quantity_in = tk.Entry(mod, width=6)
+        self.quantity_in.grid(row=1, column=1, padx=3)
+        tk.Button(mod, text="+", command=self.do_add_quantity, bg="#ccc", width=3).grid(row=1, column=2, padx=2)
+        tk.Button(mod, text="-", command=self.do_minus_quantity, bg="#ccc", width=3).grid(row=1, column=3, padx=2)
+        
+        tk.Label(mod, text="Price:", bg="#f0f0f0").grid(row=2, column=0, pady=3, sticky="e")
+        self.price_in = tk.Entry(mod, width=6)
+        self.price_in.grid(row=2, column=1, padx=3)
+        tk.Button(mod, text="+", command=self.do_add_price, bg="#ccc", width=3).grid(row=2, column=2, padx=2)
+        tk.Button(mod, text="-", command=self.do_minus_price, bg="#ccc", width=3).grid(row=2, column=3, padx=2)
+        
+        # DISCOUNT button for Polymorphism demo
+        tk.Button(mod, text="DISCOUNT", command=self.apply_discount, bg="#9C27B0", width=8).grid(row=3, column=0, columnspan=4, pady=8)
+        
+        bottom = tk.Frame(root, bg="#f0f0f0")
+        bottom.pack(pady=10)
+        tk.Button(bottom, text="NEW", command=self.new_item, bg="#4CAF50", width=10).pack(side="left", padx=5)
+        tk.Button(bottom, text="DELETE", command=self.delete_item, bg="#f44336", width=10).pack(side="left", padx=5)
+        
+        self.update_list()
+    
+    def update_list(self):
+        self.box.delete(0, tk.END)
+        if not self.items:
+            self.box.insert(0, "Click NEW")
+        else:
+            for i, item in enumerate(self.items):
+                total = item.get_total() 
+                tag = "[DISCOUNT]" if isinstance(item, DiscountItem) else ""
+                text = f"{item.number}. {item.get_name()} | Q:{item.get_quantity()} | ${item.get_price()} | ${total:.2f} {tag}"
+                self.box.insert(i, text)
+                if self.now and item.number == self.now.number:
+                    self.box.selection_set(i)
+    
+    def pick(self, event):
+        sel = self.box.curselection()
+        if sel and sel[0] < len(self.items):
+            self.now = self.items[sel[0]]
+            self.name_in.delete(0, tk.END)
+            self.quantity_in.delete(0, tk.END)
+            self.price_in.delete(0, tk.END)
+    
+    def apply_discount(self):
+        if not self.now:
+            messagebox.showinfo("Info", "please select item!")
+            return
+        if not isinstance(self.now, DiscountItem):
+            new_item = DiscountItem(self.now.get_name(), self.now.get_quantity(), self.now.get_price())
+            new_item.number = self.now.number
+            idx = self.items.index(self.now)
+            self.items[idx] = new_item
+            self.now = new_item
+            self.update_list()
+            messagebox.showinfo("Done", "10% discount applied!")
+        else:
+            messagebox.showinfo("Info", "Already discounted!")
+    
+    def delete_item(self):
+        if not self.now: return
+        if messagebox.askyesno("Confirm", f"Delete {self.now.get_name()}?"):
+            self.items.remove(self.now)
+            self.now = None
+            self.update_list()
+    
+    def new_item(self):
+        win = tk.Toplevel(self.root)
+        win.title("New Item")
+        win.geometry("240x260")
+        win.configure(bg="#f0f0f0")
+        
+        tk.Label(win, text="Name:", bg="#f0f0f0").pack(pady=(10,2))
+        name = tk.Entry(win); name.pack()
+        tk.Label(win, text="Quantity:", bg="#f0f0f0").pack(pady=5)
+        quantity = tk.Entry(win); quantity.pack()
+        tk.Label(win, text="Price:", bg="#f0f0f0").pack(pady=5)
+        price = tk.Entry(win); price.pack()
+        
+        def save():
+            try:
+                n = name.get().strip()
+                if n:
+                    self.items.append(NormalItem(n, int(quantity.get()), float(price.get())))
+                    self.now = self.items[-1]
+                    self.update_list()
+                    win.destroy()
+            except: messagebox.showerror("Error", "Invalid!")
+        
+        tk.Button(win, text="CREATE", command=save, bg="#4CAF50", padx=20).pack(pady=20)
+    
+    def rename(self):
+        if self.now:
+            new = self.name_in.get().strip()
+            if new:
+                self.now._name = new  
+                self.update_list()
+    
+    def do_add_quantity(self):
+        if self.now:
+            n = self.quantity_in.get()
+            self.now.add_quantity(int(n) if n else 1)
+            self.update_list()
+    
+    def do_minus_quantity(self):
+        if self.now:
+            n = self.quantity_in.get()
+            self.now.minus_quantity(int(n) if n else 1)
+            self.update_list()
+    
+    def do_add_price(self):
+        if self.now:
+            n = self.price_in.get()
+            self.now.add_price(float(n) if n else 10)
+            self.update_list()
+    
+    def do_minus_price(self):
+        if self.now:
+            n = self.price_in.get()
+            self.now.minus_price(float(n) if n else 10)
+            self.update_list()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    App(root)
+    root.mainloop()
